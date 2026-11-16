@@ -1,0 +1,83 @@
+name: Build EcoOne apps
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  desktop-windows:
+    name: Windows desktop installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run dist:windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/EcoOne-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+  desktop-linux:
+    name: Linux desktop AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run dist:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/EcoOne.AppImage
+          if-no-files-found: error
+          retention-days: 30
+  android:
+    name: Android and Android TV APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Build debug APK
+        run: gradle -p android :app:assembleDebug
+      - name: Rename APK
+        run: |
+          mkdir -p release-assets
+          cp android/app/build/outputs/apk/debug/app-debug.apk release-assets/EcoOne-Android-TV.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: release-assets/EcoOne-Android-TV.apk
+          if-no-files-found: error
+          retention-days: 30
+  publish-release:
+    name: Publish release downloads
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop-windows, desktop-linux, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+      - name: Create GitHub release and attach installers
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/*

@@ -32,6 +32,7 @@ async function startServer(opts={}){
   if(url.pathname.startsWith('/api/')){
    try{
     if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{app:'EcoOne',version:VERSION,port:server.address()?.port||PORT,addresses:lan()});
+    if(req.method==='GET'&&url.pathname==='/api/local-info'){if(!local(req.socket.remoteAddress))return json(res,403,{error:'Local host only'});return json(res,200,{pairingCode:code})}
     if(req.method==='POST'&&url.pathname==='/api/pair'){
      const b=await body(req);if(!equal(String(b.code||'').trim(),code))return json(res,401,{error:'Pairing code is incorrect. Check the host terminal.'});
      const token=crypto.randomBytes(32).toString('hex'),d={id:crypto.randomUUID(),name:cleanName(b.name),platform:String(b.platform||'Web').slice(0,24),hash:digest(token),addedAt:new Date().toISOString()};

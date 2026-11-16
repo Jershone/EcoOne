@@ -2,52 +2,85 @@
 
 **One ecosystem. Every device.**
 
-EcoOne is an open ecosystem project exploring a unified experience across Windows, Android, computers, phones and compatible smart-home devices.
+EcoOne is an open-source, local-first project for connecting computers, phones, TVs and compatible smart-home devices without requiring one hardware brand.
 
-## Current status
+This repository now contains the first runnable foundation: a private LAN server, device pairing, a web/PWA dashboard, a Windows desktop app shell, an Android / Android TV companion, and a Home Assistant bridge.
 
-This repository currently contains the public concept and landing website. Native companion apps, device discovery, secure pairing, cross-device clipboard, file handoff, remote input, AI provider integrations and smart-home adapters are planned work, not features already delivered.
+## Start it
 
-## Product areas
+Requirements: Node.js 22 or newer.
 
-- **One Connect** — phone/computer pairing, shared clipboard, file handoff and phone-as-touchpad.
-- **One AI** — a provider-agnostic assistant with optional API integrations.
-- **One Home** — integrations for compatible smart-home platforms and appliances.
-- **One Search** — web and personal search experience.
-- **One Office** — interoperable documents, spreadsheets and presentations.
-- **One Cloud** — user-controlled file sync and preferences.
+**Windows PowerShell**
+```powershell
+git clone https://github.com/Jershone/EcoOne.git
+cd EcoOne
+.\ecoone.ps1
+```
 
-## Website
+On Linux/macOS:
+```bash
+git clone https://github.com/Jershone/EcoOne.git
+cd EcoOne
+chmod +x ecoone
+./ecoone
+```
 
-Lightweight static HTML/CSS/JS. No build step or package installation is required. Open index.html locally, or publish with GitHub Pages.
+The launcher installs npm dependencies automatically on first run and starts the private server on port `43821`. The terminal prints the local address, LAN address(es) and a six-digit pairing code. Keep the host running while connected devices use EcoOne.
 
-## Enable GitHub Pages
+Read [docs/START-HERE.md](docs/START-HERE.md) for phone, TV and desktop installation.
 
-Open **Settings → Pages**. Under **Build and deployment**, select **GitHub Actions**. The included workflow deploys the static site whenever changes are pushed to main.
+## First release scope (0.1)
 
-The expected site address is https://jershone.github.io/EcoOne/ once Pages is enabled and the workflow succeeds.
+- Local HTTP server for a trusted home LAN.
+- Six-digit device pairing and local device registry.
+- Paired-device online status.
+- Authenticated WebSocket sessions and a small device-to-device relay foundation.
+- Responsive web dashboard and installable PWA.
+- Electron desktop app and Windows / Linux build definitions.
+- Android / Android TV companion APK.
+- Home Assistant connection and control for supported lights, switches and media players.
 
-## Development principles
+## Smart home
 
-1. Reuse mature open-source projects instead of rebuilding everything.
-2. Respect upstream licenses, attribution and contribution rules.
-3. Keep device communication secure and explicit; pairing must be authorized by the device owner.
-4. Prefer local networking and user-controlled data storage where practical.
-5. Never claim an integration works until it has been implemented and tested on real hardware.
+Home Assistant is the supported bridge in this release. Add vendor integrations in Home Assistant, then connect EcoOne with a Home Assistant URL and long-lived access token. EcoOne stores that token in the host's local data folder and does not send it to paired devices.
+
+See [docs/SMART-HOME.md](docs/SMART-HOME.md). Device availability depends on the Home Assistant integration and hardware model.
+
+## Downloads and builds
+
+- [Downloads page](https://jershone.github.io/EcoOne/downloads.html)
+- [GitHub Releases](https://github.com/Jershone/EcoOne/releases)
+- [GitHub Actions builds](https://github.com/Jershone/EcoOne/actions)
+
+GitHub Actions builds Windows, Linux and Android packages on pushes to `main`. Push a version tag such as `v0.1.0` to create a GitHub Release with downloadable installers.
+
+## Build locally
+
+```bash
+npm install
+npm test
+npm run desktop
+```
+
+Windows installer: `npm run dist:windows` on Windows. Linux AppImage: `npm run dist:linux` on Linux. Android: open `android/` in Android Studio or use Gradle 8.13 and JDK 17 with `gradle -p android :app:assembleDebug`.
 
 ## Roadmap
 
-- [x] Project identity and responsive concept website
-- [x] Public product areas and project direction
-- [ ] Architecture and technology decisions
-- [ ] Windows companion prototype
-- [ ] Android companion prototype
-- [ ] Secure device pairing and discovery
-- [ ] Clipboard and file transfer
-- [ ] Remote touchpad / keyboard mode
-- [ ] AI provider adapter layer
-- [ ] Smart-home integration layer
+1. One Connect: clipboard sync, deliberate file transfer, phone touchpad / keyboard, safe device-to-device flows.
+2. One Home: more Home Assistant entity domains, local discovery and carefully scoped vendor adapters.
+3. One AI: provider settings and a shared assistant layer.
+4. One Browser and One Search: privacy controls and open search providers.
+5. One Office: open document formats and integrations with proven projects.
+6. One Cloud: optional self-hosted sync and backup.
+
+The roadmap is not a claim that these features already work. Each area needs separate implementation, permissions, compatibility testing and security review.
+
+## Security model and limits
+
+EcoOne 0.1 is designed for a trusted private home network, not public internet access. Do not port-forward port `43821`. Pairing codes are displayed in the host terminal; paired devices receive individual tokens. The server stores token hashes for device pairing. Home Assistant's long-lived token is stored locally on the host and should be protected like a password.
+
+The first release uses HTTP on the LAN and does not yet provide remote access, HTTPS certificates, code signing or production mobile signing. Do not use it on public Wi-Fi or expose it to the internet.
 
 ## License
 
-Original website and project material are offered under the MIT License. Third-party dependencies and integrations retain their own licenses and terms.
+MIT for the original EcoOne code in this repository. Third-party dependencies and future integrations retain their own licenses.

@@ -1,0 +1,7 @@
+{
+  "name":"ecoone","version":"0.1.0","private":true,"description":"EcoOne local-first device hub","main":"electron/main.cjs","license":"MIT","engines":{"node":">=22"},
+  "scripts":{"start":"node server/index.js","dev":"node --watch server/index.js","desktop":"electron .","dist:windows":"electron-builder --win nsis","dist:linux":"electron-builder --linux AppImage","test":"node --test"},
+  "dependencies":{"ws":"^8.18.3"},
+  "devDependencies":{"electron":"45.3.3","electron-builder":"^26.0.12"},
+  "build":{"appId":"com.ecoone.desktop","productName":"EcoOne","asar":true,"directories":{"output":"dist"},"files":["electron/**/*","server/**/*","package.json","!server/**/*.test.js"],"win":{"target":["nsis"],"artifactName":"EcoOne-Setup.${ext}"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true,"createStartMenuShortcut":true},"linux":{"target":["AppImage"],"category":"Utility","artifactName":"EcoOne.AppImage"}}
+}

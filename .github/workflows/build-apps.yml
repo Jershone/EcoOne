@@ -67,7 +67,7 @@ jobs:
           retention-days: 30
   publish-release:
     name: Publish release downloads
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-preview]'))
     needs: [desktop-windows, desktop-linux, android]
     runs-on: ubuntu-latest
     steps:
@@ -79,5 +79,15 @@ jobs:
       - name: Create GitHub release and attach installers
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          tag_name: v0.1.0-preview.1
+          target_commitish: ${{ github.sha }}
+          name: EcoOne 0.1.0 Preview 1
+          body: |
+            First EcoOne test build.
+            
+            Includes a private LAN device hub, device pairing, Android / Android TV companion, Windows desktop app, Linux AppImage and Home Assistant controls for supported entities.
+            
+            This is an unsigned early preview. The Android APK is a debug build. Keep EcoOne on a trusted home network and do not port-forward its server.
+          prerelease: true
+          make_latest: false
           files: release-assets/*

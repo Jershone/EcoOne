@@ -108,12 +108,16 @@ echo "Omnexa containers:"
 docker compose ps
 echo
 echo "Initial setup:"
-echo "  Portal:       http://${PI_IP}"
-echo "  Authentik:    http://${PI_IP}:9000"
-echo "  Open WebUI:   https://ai.${ONEOS_DOMAIN:-omnexa.duckdns.org}"
+echo "  Portal:       http://${TAIL_IP:-$PI_IP}"
+echo "  Authentik:    http://${TAIL_IP:-$PI_IP}:9000"
+echo "  Open WebUI:   http://${TAIL_IP:-$PI_IP}:3000"
 echo
 if [[ -n "$TAIL_IP" ]]; then
   echo "Private Tailscale IP: $TAIL_IP"
+  echo "Nextcloud:     http://$TAIL_IP:8081"
+  echo "Vaultwarden:   http://$TAIL_IP:8082"
+  echo "Navet:         http://$TAIL_IP:8083"
+  echo "Home Assistant:http://$TAIL_IP:8123"
   echo "Use this IP from your other devices after installing Tailscale and joining the same tailnet."
 fi
 echo

@@ -19,11 +19,16 @@ if ! command -v docker >/dev/null 2>&1; then
   sudo sh /tmp/omnexa-docker-install.sh
   rm -f /tmp/omnexa-docker-install.sh
   sudo usermod -aG docker "$USER"
-  echo "Docker installed. Log out and back in so your account can use Docker, then run ./omnexa-run again."
-  exit 0
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
+# Use the current login session's Docker group if available; otherwise use sudo
+# so the first installation can complete without requiring a logout/re-login.
+if docker info >/dev/null 2>&1; then
+  DOCKER=(docker)
+else
+  DOCKER=(sudo docker)
+fi
+if ! "${DOCKER[@]}" compose version >/dev/null 2>&1; then
   echo "Docker Compose v2 is required. Install the Docker Compose plugin and rerun."
   exit 1
 fi
@@ -122,11 +127,11 @@ unset OMNEXA_TAILSCALE_HOST
 
 mkdir -p data/{caddy,caddy-config,open-webui,mariadb,redis,nextcloud,vaultwarden,homeassistant,navet,authentik-postgres,authentik-media,authentik-certs,authentik-custom-templates} backups
 chmod 600 .env
-docker compose config --quiet
+"${DOCKER[@]}" compose config --quiet
 echo "Pulling service images..."
-docker compose pull
+"${DOCKER[@]}" compose pull
 echo "Starting Omnexa..."
-docker compose up -d --build --remove-orphans
+"${DOCKER[@]}" compose up -d --build --remove-orphans
 
 echo
 echo "Configuring private HTTPS endpoints with Tailscale Serve..."
@@ -147,12 +152,12 @@ PI_IP="$(hostname -I | awk '{print $1}')"
 TAIL_IP="$(tailscale ip -4 2>/dev/null | head -n1 || true)"
 echo
 echo "Omnexa containers:"
-docker compose ps
+"${DOCKER[@]}" compose ps
 echo
 echo "Initial setup:"
-echo "  Portal:       http://${TAIL_IP:-$PI_IP}"
-echo "  Authentik:    http://${TAIL_IP:-$PI_IP}:9000"
-echo "  Open WebUI:   http://${TAIL_IP:-$PI_IP}:3000"
+echo "  Portal (LAN): http://${PI_IP}"
+echo "  Authentik (LAN): http://${PI_IP}:9000"
+echo "  Open WebUI (LAN): http://${PI_IP}:3000"
 echo
 if [[ -n "$TAIL_IP" ]]; then
   echo "Private Tailscale IP: $TAIL_IP"

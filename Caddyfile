@@ -1,0 +1,77 @@
+{
+    admin off
+}
+
+:80 {
+    encode zstd gzip
+    reverse_proxy portal:80
+}
+
+# Authentik's embedded proxy outpost protects the browser-facing apps.
+# These listeners are bound to 127.0.0.1 on the Pi and reached via Tailscale Serve.
+:8181 {
+    header -X-Frame-Options
+    route {
+        reverse_proxy /outpost.goauthentik.io/* authentik-server:9000
+        forward_auth authentik-server:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Entitlements X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+        }
+        reverse_proxy open-webui:8080
+    }
+}
+:8182 {
+    route {
+        reverse_proxy /outpost.goauthentik.io/* authentik-server:9000
+        forward_auth authentik-server:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Entitlements X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+        }
+        reverse_proxy nextcloud:80
+    }
+}
+:8183 {
+    route {
+        reverse_proxy /outpost.goauthentik.io/* authentik-server:9000
+        forward_auth authentik-server:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+            copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Entitlements X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+        }
+        reverse_proxy navet:80
+    }
+}
+
+{$ONEOS_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    reverse_proxy portal:80
+}
+ai.{$ONEOS_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    header -X-Frame-Options
+    reverse_proxy open-webui:8080
+}
+cloud.{$ONEOS_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    redir /.well-known/carddav /remote.php/dav 301
+    redir /.well-known/caldav /remote.php/dav 301
+    reverse_proxy nextcloud:80
+}
+vault.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy vaultwarden:80
+}
+home.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy host.docker.internal:8123
+}
+navet.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy navet:80
+}
+connect.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy connect:8000
+}

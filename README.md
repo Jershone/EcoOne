@@ -1,86 +1,65 @@
-# EcoOne
+# Omnexa — connected self-hosted ecosystem
 
-**One ecosystem. Every device.**
+Omnexa is a self-hosted app ecosystem for Raspberry Pi OS 64-bit. It is not a replacement operating system: each upstream app keeps its own interface. The portal is a launcher, and the integration layer connects selected services.
 
-EcoOne is an open-source, local-first project for connecting computers, phones, TVs and compatible smart-home devices without requiring one hardware brand.
+## One-command installation
 
-This repository now contains the first runnable foundation: a private LAN server, device pairing, a web/PWA dashboard, a Windows desktop app shell, an Android / Android TV companion, and a Home Assistant bridge.
-
-## Start it
-
-Requirements: Node.js 22 or newer.
-
-**Windows PowerShell**
-```powershell
-git clone https://github.com/Jershone/EcoOne.git
-cd EcoOne
-.\ecoone.ps1
-```
-
-On Linux/macOS:
-```bash
-git clone https://github.com/Jershone/EcoOne.git
-cd EcoOne
-chmod +x ecoone
-./ecoone
-```
-
-The launcher installs npm dependencies automatically on first run and starts the private server on port `43821`. The terminal prints the local address, LAN address(es) and a six-digit pairing code. Keep the host running while connected devices use EcoOne.
-
-Read [docs/START-HERE.md](docs/START-HERE.md) for phone, TV and desktop installation.
-
-## First release scope (0.1)
-
-- Local HTTP server for a trusted home LAN.
-- Six-digit device pairing and local device registry.
-- Paired-device online status.
-- Authenticated WebSocket sessions and a small device-to-device relay foundation.
-- Responsive web dashboard and installable PWA.
-- Electron desktop app and Windows / Linux build definitions.
-- Android / Android TV companion APK.
-- Home Assistant connection and control for supported lights, switches and media players.
-
-## Smart home
-
-Home Assistant is the supported bridge in this release. Add vendor integrations in Home Assistant, then connect EcoOne with a Home Assistant URL and long-lived access token. EcoOne stores that token in the host's local data folder and does not send it to paired devices.
-
-See [docs/SMART-HOME.md](docs/SMART-HOME.md). Device availability depends on the Home Assistant integration and hardware model.
-
-## Downloads and builds
-
-- [Downloads page](https://jershone.github.io/EcoOne/downloads.html)
-- [GitHub Releases](https://github.com/Jershone/EcoOne/releases)
-- [GitHub Actions builds](https://github.com/Jershone/EcoOne/actions)
-
-GitHub Actions builds Windows, Linux and Android packages on pushes to `main`. Push a version tag such as `v0.1.0` to create a GitHub Release with downloadable installers.
-
-## Build locally
+On a fresh Raspberry Pi OS 64-bit installation:
 
 ```bash
-npm install
-npm test
-npm run desktop
+sudo apt update
+sudo apt install -y git curl ca-certificates
+git clone https://github.com/Jershone/EcoOne.git Omnexa
+cd Omnexa
+chmod +x omnexa-run
+./omnexa-run
 ```
 
-Windows installer: `npm run dist:windows` on Windows. Linux AppImage: `npm run dist:linux` on Linux. Android: open `android/` in Android Studio or use Gradle 8.13 and JDK 17 with `gradle -p android :app:assembleDebug`.
+The installer checks architecture, memory, and disk space; installs Docker if needed; generates secrets; asks for separate Authentik and Nextcloud administrator passwords; enrolls the Pi in Tailscale; generates the Authentik forward-auth blueprint for its MagicDNS hostname; validates Compose; and starts the stack.
 
-## Roadmap
+Tailscale sign-in is interactive. Install Tailscale on each phone/laptop and join the same tailnet. Enable MagicDNS and HTTPS certificates when prompted. No router port forwarding is required.
 
-1. One Connect: clipboard sync, deliberate file transfer, phone touchpad / keyboard, safe device-to-device flows.
-2. One Home: more Home Assistant entity domains, local discovery and carefully scoped vendor adapters.
-3. One AI: provider settings and a shared assistant layer.
-4. One Browser and One Search: privacy controls and open search providers.
-5. One Office: open document formats and integrations with proven projects.
-6. One Cloud: optional self-hosted sync and backup.
+## Authentication model
 
-The roadmap is not a claim that these features already work. Each area needs separate implementation, permissions, compatibility testing and security review.
+Authentik is the central identity provider and user/group directory. The installer automatically configures its embedded proxy outpost and a shared forward-auth provider for browser access to Open WebUI, Nextcloud, and Navet.
 
-## Security model and limits
+Forward authentication is an access gate, not automatic account federation. Those upstream apps still retain their own account login until their native OIDC integration is configured. Navet also uses Home Assistant's supported sign-in. Home Assistant and Vaultwarden retain native authentication because generic proxy redirects can break their APIs, device integrations, and Bitwarden clients. Tailscale identity remains independent for recovery.
 
-EcoOne 0.1 is designed for a trusted private home network, not public internet access. Do not port-forward port `43821`. Pairing codes are displayed in the host terminal; paired devices receive individual tokens. The server stores token hashes for device pairing. Home Assistant's long-lived token is stored locally on the host and should be protected like a password.
+See [docs/authentication.md](docs/authentication.md) for the exact boundaries and setup details.
 
-The first release uses HTTP on the LAN and does not yet provide remote access, HTTPS certificates, code signing or production mobile signing. Do not use it on public Wi-Fi or expose it to the internet.
+## Included services
 
-## License
+| Service | Purpose |
+|---|---|
+| Omnexa portal | Launcher for hosted services |
+| Authentik | Central identity and shared browser access |
+| Open WebUI | Cloud model interface; no local LLM |
+| Nextcloud + MariaDB + Redis + cron | Files and collaboration |
+| Vaultwarden | Password manager with native Bitwarden-compatible auth |
+| Home Assistant | Smart-home platform |
+| Navet | Home Assistant-connected dashboard |
+| Omnexa Connect | Limited API tools for Nextcloud and Home Assistant |
+| Caddy | Reverse proxy and Authentik forward-auth gate |
+| Tailscale | Private remote access |
 
-MIT for the original EcoOne code in this repository. Third-party dependencies and future integrations retain their own licenses.
+Magic Earth and Google Search remain external services. Immich and LibreChat are not included. AppFlowy is optional and is not installed by the core installer.
+
+## Hardware
+
+Target: Raspberry Pi 4, 4 GB RAM, Raspberry Pi OS 64-bit. The full stack is demanding for 4 GB. Use an SSD for persistent application/database data as soon as possible; the microSD is suitable for initial setup, not ideal long-term storage. AppFlowy remains optional and should be deferred until resource usage is measured.
+
+## Operations
+
+```bash
+bash ./scripts/doctor.sh     # endpoint and resource checks
+./scripts/update.sh          # pull and update containers
+./scripts/backup.sh          # local backup; copy it off the Pi
+docker compose ps
+docker compose logs -f authentik-server authentik-worker
+```
+
+Keep `.env`, `data/`, and `backups/` private. A backup on the same SD card is not disaster recovery.
+
+## Validation status
+
+The repository includes CI checks for shell syntax, Python syntax, and Docker Compose configuration. These checks do not replace a real installation test on the target Raspberry Pi. Do not rely on the stack for critical data until the Pi installation, app sign-ins, backups, restores, and remote access have all been verified.

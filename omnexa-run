@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+if [[ "${1:-}" == "--help" ]]; then
+  echo "Usage: ./omnexa-run [--install]"
+  echo "Installs Docker, configures Authentik, enrolls this Pi in Tailscale, and starts Omnexa."
+  exit 0
+fi
+if [[ $EUID -eq 0 ]]; then echo "Run this as your normal Raspberry Pi user, not with sudo."; exit 1; fi
+bash ./scripts/preflight.sh
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Installing Docker Engine..."
+  curl -fsSL https://get.docker.com -o /tmp/omnexa-docker-install.sh
+  sudo sh /tmp/omnexa-docker-install.sh
+  rm -f /tmp/omnexa-docker-install.sh
+  sudo usermod -aG docker "$USER"
+fi
+if docker info >/dev/null 2>&1; then DOCKER=(docker); else DOCKER=(sudo docker); fi
+"${DOCKER[@]}" compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required."; exit 1; }
+
+if [[ ! -f .env ]]; then cp .env.example .env; fi
+if grep -q 'CHANGE_ME' .env || ! grep -q '^AUTHENTIK_BOOTSTRAP_EMAIL=.' .env; then
+  echo "First-time Omnexa administrator setup"
+  read -rp "Administrator email: " admin_email
+  [[ "$admin_email" == *@*.* ]] || { echo "Enter a valid email address."; exit 1; }
+  read -rsp "Authentik administrator password (minimum 12 characters): " admin_password; echo
+  [[ ${#admin_password} -ge 12 ]] || { echo "Password must be at least 12 characters."; exit 1; }
+  read -rsp "Nextcloud administrator password (minimum 12 characters): " nextcloud_password; echo
+  [[ ${#nextcloud_password} -ge 12 ]] || { echo "Password must be at least 12 characters."; exit 1; }
+  export OMNEXA_ADMIN_EMAIL="$admin_email" OMNEXA_ADMIN_PASSWORD="$admin_password" OMNEXA_NEXTCLOUD_PASSWORD="$nextcloud_password"
+  python3 - <<'PY'
+from pathlib import Path
+import os,secrets
+p=Path(".env")
+vals={"AUTHENTIK_BOOTSTRAP_EMAIL":os.environ["OMNEXA_ADMIN_EMAIL"],"AUTHENTIK_BOOTSTRAP_PASSWORD":os.environ["OMNEXA_ADMIN_PASSWORD"],"NEXTCLOUD_ADMIN_PASSWORD":os.environ["OMNEXA_NEXTCLOUD_PASSWORD"]}
+sizes={"WEBUI_SECRET_KEY":48,"CONNECT_API_KEY":40,"MYSQL_ROOT_PASSWORD":32,"MYSQL_PASSWORD":32,"NEXTCLOUD_ADMIN_PASSWORD":28,"AUTHENTIK_POSTGRES_PASSWORD":36,"AUTHENTIK_SECRET_KEY":60}
+out=[]; seen=set()
+for line in p.read_text().splitlines():
+    if "=" in line and not line.lstrip().startswith("#"):
+        k,v=line.split("=",1)
+        if k in vals:
+            v="'"+vals[k].replace("\\","\\\\").replace("'","\\'")+"'"; seen.add(k)
+        elif k in sizes and (v=="CHANGE_ME" or not v): v=secrets.token_urlsafe(sizes[k])
+        line=f"{k}={v}"
+    out.append(line)
+for k,v in vals.items():
+    if k not in seen: out.append(f"{k}='"+v.replace("\\","\\\\").replace("'","\\'")+"'")
+p.write_text("\n".join(out)+"\n")
+PY
+  unset OMNEXA_ADMIN_PASSWORD OMNEXA_NEXTCLOUD_PASSWORD
+fi
+
+if ! command -v tailscale >/dev/null 2>&1; then curl -fsSL https://tailscale.com/install.sh | sh; fi
+if ! tailscale status >/dev/null 2>&1; then echo "Sign in to add this Pi to your tailnet."; sudo tailscale up; fi
+TAIL_DNS="$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Self",{}).get("DNSName","").rstrip("."))')"
+[[ -n "$TAIL_DNS" ]] || { echo "Enable MagicDNS in the Tailscale admin console and rerun."; exit 1; }
+export OMNEXA_TAILSCALE_HOST="$TAIL_DNS"
+python3 - <<'PY'
+from pathlib import Path
+import os
+p=Path(".env"); key="TAILSCALE_HOSTNAME"; val=os.environ["OMNEXA_TAILSCALE_HOST"]
+lines=p.read_text().splitlines(); out=[]; found=False
+for line in lines:
+    if line.startswith(key+"="): out.append(f"{key}={val}"); found=True
+    else: out.append(line)
+if not found: out.append(f"{key}={val}")
+p.write_text("\n".join(out)+"\n")
+PY
+unset OMNEXA_TAILSCALE_HOST
+
+mkdir -p config/authentik/blueprints data/{caddy,caddy-config,open-webui,mariadb,redis,nextcloud,vaultwarden,homeassistant,navet,authentik-postgres,authentik-media,authentik-certs,authentik-custom-templates} backups
+python3 - "$TAIL_DNS" <<'PY'
+from pathlib import Path
+import sys
+src=Path("config/authentik/blueprints/omnexa-forward-auth.yaml.in")
+dst=Path("config/authentik/blueprints/omnexa-forward-auth.yaml")
+if not src.exists(): raise SystemExit("Missing Authentik blueprint template.")
+dst.write_text(src.read_text().replace("__TAILSCALE_HOST__",sys.argv[1]))
+PY
+chmod 600 .env
+"${DOCKER[@]}" compose config --quiet
+echo "Pulling images..."
+"${DOCKER[@]}" compose pull
+echo "Starting Omnexa..."
+"${DOCKER[@]}" compose up -d --build --remove-orphans
+
+echo "Waiting for Authentik readiness..."
+ready=0
+for _ in $(seq 1 60); do
+  if curl -fsS http://127.0.0.1:9000/-/health/ready/ >/dev/null 2>&1; then ready=1; break; fi
+  sleep 5
+done
+if [[ "$ready" -ne 1 ]]; then
+  echo "Authentik did not become ready. Inspect: ${DOCKER[*]} compose logs authentik-server authentik-worker"
+  exit 1
+fi
+echo "Authentik is ready; its worker will discover the Omnexa blueprint."
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:80
+sudo tailscale serve --bg --https=8444 http://127.0.0.1:9000
+sudo tailscale serve --bg --https=8445 http://127.0.0.1:8181
+sudo tailscale serve --bg --https=8446 http://127.0.0.1:8182
+sudo tailscale serve --bg --https=8447 http://127.0.0.1:8082
+sudo tailscale serve --bg --https=8448 http://127.0.0.1:8183
+
+echo
+"${DOCKER[@]}" compose ps
+echo
+echo "Private Tailscale URLs:"
+echo "  Portal:         https://$TAIL_DNS:8443"
+echo "  Authentik:      https://$TAIL_DNS:8444"
+echo "  Open WebUI:     https://$TAIL_DNS:8445 (Authentik access gate; app account remains)"
+echo "  Nextcloud:      https://$TAIL_DNS:8446 (Authentik access gate; app account remains)"
+echo "  Vaultwarden:    https://$TAIL_DNS:8447 (native Bitwarden-compatible login)"
+echo "  Navet:          https://$TAIL_DNS:8448 (Authentik access gate; then Home Assistant sign-in)"
+echo "  Home Assistant: http://$(tailscale ip -4 | head -n1):8123 (native login/API)"
+echo
+echo "Run ./scripts/doctor.sh to check endpoints."
+echo "Do not enable Tailscale Funnel or router port forwarding."

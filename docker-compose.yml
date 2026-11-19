@@ -1,0 +1,233 @@
+name: omnexa
+
+services:
+  caddy:
+    image: caddy:2
+    container_name: omnexa-caddy
+    restart: unless-stopped
+    environment:
+      ONEOS_DOMAIN: ${ONEOS_DOMAIN:-omnexa.duckdns.org}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8181:8181"
+      - "127.0.0.1:8182:8182"
+      - "127.0.0.1:8183:8183"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+      - ./data/caddy-config:/config
+    depends_on:
+      - portal
+      - open-webui
+      - nextcloud
+      - vaultwarden
+      - navet
+      - connect
+      - authentik-server
+    networks: [omnexa]
+
+  portal:
+    image: nginx:alpine
+    container_name: omnexa-portal
+    restart: unless-stopped
+    volumes:
+      - ./portal:/usr/share/nginx/html:ro
+      - ./portal/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [omnexa]
+
+  open-webui:
+    image: ${OPEN_WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
+    container_name: omnexa-open-webui
+    restart: unless-stopped
+    environment:
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?Run omnexa-run first}
+      WEBUI_URL: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8445
+      ENABLE_WEBSOCKET_SUPPORT: "true"
+      ENABLE_SIGNUP: "true"
+      ENABLE_OAUTH_SIGNUP: ${OPEN_WEBUI_ENABLE_OAUTH_SIGNUP:-true}
+      OAUTH_PROVIDER_NAME: Authentik
+      OAUTH_CLIENT_ID: ${OPEN_WEBUI_OAUTH_CLIENT_ID:-}
+      OAUTH_CLIENT_SECRET: ${OPEN_WEBUI_OAUTH_CLIENT_SECRET:-}
+      OPENID_PROVIDER_URL: ${OPEN_WEBUI_OPENID_PROVIDER_URL:-}
+      OPENID_REDIRECT_URI: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8445/oauth/oidc/callback
+      OAUTH_SCOPES: openid email profile
+      OAUTH_MERGE_ACCOUNTS_BY_EMAIL: "true"
+      DEFAULT_USER_ROLE: user
+      CORS_ALLOW_ORIGIN: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8445;https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8443
+      WEBUI_SESSION_COOKIE_SECURE: "true"
+      WEBUI_AUTH_COOKIE_SECURE: "true"
+      WEBUI_SESSION_COOKIE_SAME_SITE: lax
+      WEBUI_AUTH_COOKIE_SAME_SITE: lax
+      XFRAME_OPTIONS: SAMEORIGIN
+      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' https://${TAILSCALE_HOSTNAME}:8443"
+    ports: ["127.0.0.1:3000:8080"]
+    volumes: ["./data/open-webui:/app/backend/data"]
+    networks: [omnexa]
+
+  nextcloud-db:
+    image: mariadb:11.4
+    container_name: omnexa-nextcloud-db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run omnexa-run first}
+      MARIADB_DATABASE: nextcloud
+      MARIADB_USER: nextcloud
+      MARIADB_PASSWORD: ${MYSQL_PASSWORD:?Run omnexa-run first}
+    volumes: ["./data/mariadb:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    networks: [omnexa]
+
+  nextcloud-redis:
+    image: redis:7-alpine
+    container_name: omnexa-nextcloud-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes: ["./data/redis:/data"]
+    networks: [omnexa]
+
+  nextcloud:
+    image: ${NEXTCLOUD_IMAGE:-nextcloud:apache}
+    container_name: omnexa-nextcloud
+    restart: unless-stopped
+    depends_on:
+      nextcloud-db: {condition: service_healthy}
+      nextcloud-redis: {condition: service_started}
+    environment:
+      MYSQL_HOST: nextcloud-db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run omnexa-run first}
+      REDIS_HOST: nextcloud-redis
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-omnexaadmin}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD:?Run omnexa-run first}
+      NEXTCLOUD_TRUSTED_DOMAINS: cloud.${ONEOS_DOMAIN:-omnexa.duckdns.org} ${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8446
+      OVERWRITEHOST: ${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8446
+      OVERWRITEPROTOCOL: https
+      TRUSTED_PROXIES: 172.30.0.0/24
+      PHP_MEMORY_LIMIT: 512M
+      PHP_UPLOAD_LIMIT: 1G
+    ports: ["127.0.0.1:8081:80"]
+    volumes: ["./data/nextcloud:/var/www/html"]
+    networks: [omnexa]
+
+  nextcloud-cron:
+    image: ${NEXTCLOUD_IMAGE:-nextcloud:apache}
+    container_name: omnexa-nextcloud-cron
+    restart: unless-stopped
+    entrypoint: /cron.sh
+    depends_on: [nextcloud]
+    volumes: ["./data/nextcloud:/var/www/html"]
+    networks: [omnexa]
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: omnexa-vaultwarden
+    restart: unless-stopped
+    environment:
+      DOMAIN: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8447
+      WEBSOCKET_ENABLED: "true"
+      SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
+    ports: ["127.0.0.1:8082:80"]
+    volumes: ["./data/vaultwarden:/data"]
+    networks: [omnexa]
+
+  homeassistant:
+    image: ${HOME_ASSISTANT_IMAGE:-ghcr.io/home-assistant/home-assistant:stable}
+    container_name: omnexa-homeassistant
+    restart: unless-stopped
+    network_mode: host
+    environment: {TZ: ${TZ:-Europe/Amsterdam}}
+    volumes:
+      - ./data/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+
+  navet:
+    image: ${NAVET_IMAGE:-ghcr.io/awesomestvi/navet:latest}
+    container_name: omnexa-navet
+    restart: unless-stopped
+    ports: ["127.0.0.1:8083:80"]
+    volumes: ["./data/navet:/data"]
+    networks: [omnexa]
+
+  connect:
+    build: {context: ./connect}
+    container_name: omnexa-connect
+    restart: unless-stopped
+    environment:
+      CONNECT_API_KEY: ${CONNECT_API_KEY:?Run omnexa-run first}
+      NEXTCLOUD_URL: http://nextcloud
+      NEXTCLOUD_USERNAME: ${NEXTCLOUD_CONNECT_USER:-omnexa-ai}
+      NEXTCLOUD_APP_PASSWORD: ${NEXTCLOUD_CONNECT_APP_PASSWORD:-}
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-http://host.docker.internal:8123}
+      HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN:-}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [omnexa]
+    depends_on: [nextcloud]
+
+  authentik-db:
+    image: postgres:16-alpine
+    container_name: omnexa-authentik-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?Run omnexa-run first}
+      POSTGRES_DB: authentik
+    volumes: ["./data/authentik-postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [omnexa]
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.8.0}
+    container_name: omnexa-authentik-server
+    restart: unless-stopped
+    command: server
+    environment: &authentik-env
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Run omnexa-run first}
+      AUTHENTIK_WEB__BASE_URL: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8444
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?Run omnexa-run first}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    volumes:
+      - ./data/authentik-media:/media
+      - ./data/authentik-custom-templates:/templates
+    ports: ["127.0.0.1:9000:9000"]
+    depends_on:
+      authentik-db: {condition: service_healthy}
+    networks: [omnexa]
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.8.0}
+    container_name: omnexa-authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      <<: *authentik-env
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:?Run omnexa-run first}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?Run omnexa-run first}
+    volumes:
+      - ./data/authentik-media:/media
+      - ./data/authentik-certs:/certs
+      - ./data/authentik-custom-templates:/templates
+      - ./config/authentik/blueprints:/blueprints:ro
+    depends_on:
+      authentik-db: {condition: service_healthy}
+    networks: [omnexa]
+
+networks:
+  omnexa:
+    name: omnexa-net
+    driver: bridge
+    ipam:
+      config: [{subnet: 172.30.0.0/24}]

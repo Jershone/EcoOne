@@ -93,6 +93,33 @@ if ! tailscale status >/dev/null 2>&1; then
   sudo tailscale up
 fi
 
+TAIL_DNS="$(tailscale status --json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("Self",{}).get("DNSName","").rstrip("."))' 2>/dev/null || true)"
+if [[ -z "$TAIL_DNS" ]]; then
+  echo "Tailscale MagicDNS name is not available yet. Enable MagicDNS, then rerun ./omnexa-run."
+  exit 1
+fi
+export OMNEXA_TAILSCALE_HOST="$TAIL_DNS"
+python3 - <<'PY'
+from pathlib import Path
+import os
+p=Path(".env")
+lines=p.read_text().splitlines()
+key="TAILSCALE_HOSTNAME"
+value=os.environ["OMNEXA_TAILSCALE_HOST"]
+out=[]
+found=False
+for line in lines:
+    if line.startswith(key+"="):
+        out.append(f"{key}={value}")
+        found=True
+    else:
+        out.append(line)
+if not found:
+    out.append(f"{key}={value}")
+p.write_text("\n".join(out)+"\n")
+PY
+unset OMNEXA_TAILSCALE_HOST
+
 mkdir -p data/{caddy,caddy-config,open-webui,mariadb,redis,nextcloud,vaultwarden,homeassistant,navet,authentik-postgres,authentik-media,authentik-certs,authentik-custom-templates} backups
 chmod 600 .env
 docker compose config --quiet

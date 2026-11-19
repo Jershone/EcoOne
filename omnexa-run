@@ -108,7 +108,7 @@ echo "Omnexa containers:"
 docker compose ps
 echo
 echo "Initial setup:"
-echo "  Portal:       http://${PI_IP}:8080"
+echo "  Portal:       http://${PI_IP}"
 echo "  Authentik:    http://${PI_IP}:9000"
 echo "  Open WebUI:   https://ai.${ONEOS_DOMAIN:-omnexa.duckdns.org}"
 echo
@@ -118,4 +118,7 @@ if [[ -n "$TAIL_IP" ]]; then
 fi
 echo
 echo "Create users and app providers in Authentik. See docs/authentication.md."
+if command -v xdg-open >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+  xdg-open "http://${PI_IP}:9000" >/dev/null 2>&1 || true
+fi
 echo "Do not configure router port forwarding. DuckDNS is not used as a public ingress."

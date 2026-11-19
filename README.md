@@ -15,7 +15,7 @@ chmod +x omnexa-run
 ./omnexa-run
 ```
 
-The installer checks architecture, memory, and disk space; installs Docker if needed; generates secrets; asks for the initial Authentik administrator email/password; enrolls the Pi in Tailscale; generates the Authentik forward-auth blueprint for its MagicDNS hostname; validates Compose; and starts the stack.
+The installer checks architecture, memory, and disk space; installs Docker if needed; generates secrets; asks for separate Authentik and Nextcloud administrator passwords; enrolls the Pi in Tailscale; generates the Authentik forward-auth blueprint for its MagicDNS hostname; validates Compose; and starts the stack.
 
 Tailscale sign-in is interactive. Install Tailscale on each phone/laptop and join the same tailnet. Enable MagicDNS and HTTPS certificates when prompted. No router port forwarding is required.
 
@@ -51,7 +51,7 @@ Target: Raspberry Pi 4, 4 GB RAM, Raspberry Pi OS 64-bit. The full stack is dema
 ## Operations
 
 ```bash
-./scripts/doctor.sh          # endpoint and resource checks
+bash ./scripts/doctor.sh     # endpoint and resource checks
 ./scripts/update.sh          # pull and update containers
 ./scripts/backup.sh          # local backup; copy it off the Pi
 docker compose ps

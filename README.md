@@ -96,7 +96,7 @@ Install `caddy-root.crt` as a trusted CA certificate on your laptop and phone. K
 2. Open `https://vault.oneos.home.arpa`. Temporarily set `VAULTWARDEN_SIGNUPS_ALLOWED=true` in `.env`, restart with `docker compose up -d vaultwarden`, create your account, then set it back to `false` and restart. Do not leave public signups enabled.
 3. Open `https://home.oneos.home.arpa` and complete Home Assistant onboarding. For reverse-proxy support, add the trusted-proxy snippet from [docs/connections.md](docs/connections.md) to Home Assistant's `configuration.yaml`, then restart Home Assistant.
 4. Open `https://navet.oneos.home.arpa` and connect it to the Home Assistant address `https://home.oneos.home.arpa`. Navet uses Home Assistant as its provider; it is not a separate smart-home backend.
-5. Open `https://ai.oneos.home.arpa` and create the first Open WebUI account. The first account is the administrator. Keep signup disabled after initial setup if you do not need more accounts.
+5. Open `https://ai.oneos.home.arpa` and create the first Open WebUI account. The first account is the administrator. Then set `OPEN_WEBUI_ENABLE_SIGNUP=false` in `.env` and run `docker compose up -d open-webui` to disable further signups.
 
 ## 5. Connect cloud AI providers
 

@@ -9,7 +9,7 @@ Keep Tailscale identity independent of Authentik. If the Pi, Docker, or Authenti
 1. Install the official Tailscale app on your laptop and phone.
 2. Sign in with the same tailnet account used when enrolling the Pi.
 3. Confirm all devices appear in the Tailscale admin console.
-4. Use the Pi's Tailscale IP or MagicDNS name to reach its services privately.
+4. Use the Pi's Tailscale IP or MagicDNS name with the service ports printed by `omnexa-run`: portal 80, Authentik 9000, Open WebUI 3000, Nextcloud 8081, Vaultwarden 8082, Navet 8083, and Home Assistant 8123. These ports are reachable only to devices allowed by your tailnet ACLs, assuming your host firewall permits Tailscale traffic.
 5. Keep router port forwarding disabled. Do not expose Docker, PostgreSQL, MariaDB, Authentik admin, Vaultwarden, or Home Assistant directly to the public internet.
 
 ## DuckDNS

@@ -14,8 +14,6 @@ let loaded = false;
 function openAI() {
   const url = aiUrl();
   $('#ai-new-tab').href = url;
-  // The direct tailnet endpoint keeps Open WebUI's anti-framing policy; open it in a new tab.
-  if (tailnetHost) { window.open(url, '_blank', 'noopener'); return; }
   if (!loaded) { iframe.src = url; loaded = true; }
   drawer.classList.add('open');
   drawer.setAttribute('aria-hidden', 'false');

@@ -5,7 +5,7 @@ const iframe = $('#ai-frame');
 const backdrop = $('#drawer-backdrop');
 const host = window.location.hostname;
 const tailnetHost = host.endsWith('.ts.net') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-const ports = { ai: 8445, cloud: 8446, vault: 8447, navet: 8448, home: 8123 };
+const ports = { ai: 8445, auth: 8444, cloud: 8446, vault: 8447, navet: 8448, home: 8123 };
 const serviceUrl = (service) => tailnetHost
   ? (service === 'home' ? 'http://' : 'https://') + host + ':' + ports[service]
   : window.location.protocol + '//' + service + '.' + host;

@@ -27,7 +27,7 @@ Forward authentication is an access gate; it does not automatically create or lo
 
 ## User management
 
-Open Authentik at the private HTTPS URL printed by the installer (port 8444). Sign in as `akadmin`, then create named users and groups in Directory. The shared forward-auth provider currently grants access to users assigned to the provider's application; review access policies before adding untrusted users.
+Open Authentik at the private HTTPS URL printed by the installer (port 8444). Sign in as `akadmin`, then create named users and groups in Directory. The shared forward-auth provider is configured for the embedded outpost. Review application access policies before inviting anyone outside your trusted household.\n\nThe installer also asks for a separate Nextcloud administrator password. Open WebUI and Vaultwarden allow initial account registration only behind the private Tailscale access path; after creating the intended accounts, disable Vaultwarden signups by setting `VAULTWARDEN_SIGNUPS_ALLOWED=false` in `.env` and running `docker compose up -d --force-recreate vaultwarden`.
 
 ## Recovery
 

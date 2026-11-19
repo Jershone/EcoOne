@@ -2,6 +2,11 @@
     admin off
 }
 
+:80 {
+    encode zstd gzip
+    reverse_proxy portal:80
+}
+
 {$ONEOS_DOMAIN} {
     tls internal
     encode zstd gzip

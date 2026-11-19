@@ -134,7 +134,6 @@ services:
     container_name: omnexa-vaultwarden
     restart: unless-stopped
     environment:
-      DOMAIN: https://vault.${ONEOS_DOMAIN:-omnexa.duckdns.org}
       WEBSOCKET_ENABLED: "true"
       SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
     ports:

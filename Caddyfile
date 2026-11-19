@@ -10,6 +10,7 @@
 # Authentik's embedded proxy outpost protects the browser-facing apps.
 # These listeners are bound to 127.0.0.1 on the Pi and reached via Tailscale Serve.
 :8181 {
+    header -X-Frame-Options
     route {
         reverse_proxy /outpost.goauthentik.io/* authentik-server:9000
         forward_auth authentik-server:9000 {

@@ -5,17 +5,16 @@ const iframe = $('#ai-frame');
 const backdrop = $('#drawer-backdrop');
 const host = window.location.hostname;
 const tailnetHost = host.endsWith('.ts.net') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-const ports = { ai: 3000, cloud: 8081, vault: 8082, navet: 8083, home: 8123 };
+const ports = { ai: 8445, cloud: 8446, vault: 8447, navet: 8448, home: 8123 };
 const serviceUrl = (service) => tailnetHost
-  ? window.location.protocol + '//' + host + ':' + ports[service]
-  : window.location.protocol + '//'+ service + '.' + host;
+  ? (service === 'home' ? 'http://' : 'https://') + host + ':' + ports[service]
+  : window.location.protocol + '//' + service + '.' + host;
 const aiUrl = () => serviceUrl('ai');
 let loaded = false;
 function openAI() {
   const url = aiUrl();
   $('#ai-new-tab').href = url;
-  // Open WebUI's anti-framing policy is retained on direct tailnet-port access.
-  // The authenticated direct link works in a new tab; the embedded drawer is used on the configured app hostname.
+  // The direct tailnet endpoint keeps Open WebUI's anti-framing policy; open it in a new tab.
   if (tailnetHost) { window.open(url, '_blank', 'noopener'); return; }
   if (!loaded) { iframe.src = url; loaded = true; }
   drawer.classList.add('open');
@@ -37,9 +36,7 @@ $('#close-ai').addEventListener('click', closeAI);
 backdrop.addEventListener('click', closeAI);
 iframe.addEventListener('load', () => drawer.classList.add('loaded'));
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAI(); });
-document.querySelectorAll('[data-host]').forEach((link) => {
-  link.href = serviceUrl(link.dataset.host);
-});
+document.querySelectorAll('[data-host]').forEach((link) => { link.href = serviceUrl(link.dataset.host); });
 $('#app-flowy').addEventListener('click', (event) => {
   event.preventDefault();
   const ip = window.prompt('Enter the Omnexa host address for the optional AppFlowy server');

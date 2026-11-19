@@ -50,7 +50,7 @@ Magic Earth and Google Search remain external services. Immich and LibreChat are
 
 The chosen DNS name is `omnexa.duckdns.org`. DuckDNS only maps a name to an IP address; it does not create a secure private network. Tailscale is installed on the Pi and should also be installed on your laptop/phone. Authenticate those devices into the same tailnet. Use the Pi's Tailscale IP or MagicDNS name with the service ports printed by the installer.
 
-The installer records the Pi's MagicDNS hostname and configures private Tailscale Serve HTTPS routes (not public Funnel) for the portal and web apps. The portal's embedded Open WebUI drawer is used on the configured app hostname; on the direct Tailscale hostname the AI link opens Open WebUI in a new tab because its anti-framing policy is retained. Home Assistant remains available over the encrypted tailnet on port 8123. See `docs/remote-access.md`. Do not expose Vaultwarden, Authentik admin, or database ports to the public internet.
+The installer records the Pi's MagicDNS hostname, sets Authentik's external base URL, and configures private Tailscale Serve HTTPS routes (not public Funnel) for the portal and web apps. The portal's embedded Open WebUI drawer is used on the configured app hostname; on the direct Tailscale hostname the AI link opens Open WebUI in a new tab because its anti-framing policy is retained. Home Assistant remains available over the encrypted tailnet on port 8123. See `docs/remote-access.md`. Do not expose Vaultwarden, Authentik admin, or database ports to the public internet.
 
 ## Hardware notes
 

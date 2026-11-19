@@ -101,6 +101,21 @@ docker compose pull
 echo "Starting Omnexa..."
 docker compose up -d --build --remove-orphans
 
+echo
+echo "Configuring private HTTPS endpoints with Tailscale Serve..."
+SERVE_OK=1
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:80 || SERVE_OK=0
+if [[ "$SERVE_OK" -eq 1 ]]; then
+  sudo tailscale serve --bg --https=8444 http://127.0.0.1:9000 || echo "Warning: Authentik Serve route was not configured."
+  sudo tailscale serve --bg --https=8445 http://127.0.0.1:3000 || echo "Warning: Open WebUI Serve route was not configured."
+  sudo tailscale serve --bg --https=8446 http://127.0.0.1:8081 || echo "Warning: Nextcloud Serve route was not configured."
+  sudo tailscale serve --bg --https=8447 http://127.0.0.1:8082 || echo "Warning: Vaultwarden Serve route was not configured."
+  sudo tailscale serve --bg --https=8448 http://127.0.0.1:8083 || echo "Warning: Navet Serve route was not configured."
+else
+  echo "Tailscale HTTPS/Serve may need enabling in the tailnet admin console."
+  echo "After enabling HTTPS certificates, rerun ./omnexa-run to configure the private routes."
+fi
+
 PI_IP="$(hostname -I | awk '{print $1}')"
 TAIL_IP="$(tailscale ip -4 2>/dev/null | head -n1 || true)"
 echo
@@ -121,6 +136,18 @@ if [[ -n "$TAIL_IP" ]]; then
   echo "Use this IP from your other devices after installing Tailscale and joining the same tailnet."
 fi
 echo
+TAIL_DNS="$(tailscale status --json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("Self",{}).get("DNSName","").rstrip("."))' 2>/dev/null || true)"
+if [[ -n "$TAIL_DNS" ]]; then
+  echo
+  echo "Private HTTPS addresses (Tailscale Serve):"
+  echo "  Portal:       https://$TAIL_DNS:8443"
+  echo "  Authentik:    https://$TAIL_DNS:8444"
+  echo "  Open WebUI:   https://$TAIL_DNS:8445"
+  echo "  Nextcloud:    https://$TAIL_DNS:8446"
+  echo "  Vaultwarden:  https://$TAIL_DNS:8447"
+  echo "  Navet:        https://$TAIL_DNS:8448"
+  echo "  Home Assistant: http://$TAIL_IP:8123 (private tailnet traffic)"
+fi
 echo "Create users and app providers in Authentik. See docs/authentication.md."
 if command -v xdg-open >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
   xdg-open "http://${PI_IP}:9000" >/dev/null 2>&1 || true

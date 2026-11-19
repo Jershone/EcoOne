@@ -7,10 +7,10 @@ printf '\nEndpoint checks (from the Pi itself):\n'
 check(){ local name="$1" url="$2"; local code; code="$(curl -k -sS -o /dev/null -w '%{http_code}' --max-time 8 "$url" || true)"; if [[ "$code" =~ ^(2|3)[0-9][0-9]$ ]]; then printf '  OK   %-18s HTTP %s\n' "$name" "$code"; else printf '  FAIL %-18s HTTP %s\n' "$name" "${code:-no response}"; fi; }
 check Portal http://127.0.0.1/
 check Authentik http://127.0.0.1:9000/-/health/ready/
-check Open-WebUI http://127.0.0.1:3000/health
-check Nextcloud http://127.0.0.1:8081/status.php
+check Open-WebUI-Auth-Gate http://127.0.0.1:8181
+check Nextcloud-Auth-Gate http://127.0.0.1:8182
 check Vaultwarden http://127.0.0.1:8082/alive
-check Navet http://127.0.0.1:8083/
+check Navet-Auth-Gate http://127.0.0.1:8183
 check Home-Assistant http://127.0.0.1:8123/
 printf '\nResource summary:\n'
 free -h

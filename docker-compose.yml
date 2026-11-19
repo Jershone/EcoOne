@@ -112,7 +112,7 @@ services:
       MYSQL_USER: nextcloud
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run omnexa-run first}
       REDIS_HOST: nextcloud-redis
-      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-om nex aadmin}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:-omnexaadmin}
       NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD:?Run omnexa-run first}
       NEXTCLOUD_TRUSTED_DOMAINS: cloud.${ONEOS_DOMAIN:-omnexa.duckdns.org}
       OVERWRITEHOST: cloud.${ONEOS_DOMAIN:-omnexa.duckdns.org}
@@ -166,7 +166,7 @@ services:
     environment:
       CONNECT_API_KEY: ${CONNECT_API_KEY:?Run omnexa-run first}
       NEXTCLOUD_URL: http://nextcloud
-      NEXTCLOUD_USERNAME: ${NEXTCLOUD_CONNECT_USER:-om nexa-ai}
+      NEXTCLOUD_USERNAME: ${NEXTCLOUD_CONNECT_USER:-omnexa-ai}
       NEXTCLOUD_APP_PASSWORD: ${NEXTCLOUD_CONNECT_APP_PASSWORD:-}
       HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-http://host.docker.internal:8123}
       HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN:-}

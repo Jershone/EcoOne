@@ -48,9 +48,9 @@ Magic Earth and Google Search remain external services. Immich and LibreChat are
 
 ## Remote access and DuckDNS
 
-The chosen DNS name is `omnexa.duckdns.org`. DuckDNS only maps a name to an IP address; it does not create a secure private network. Tailscale is installed on the Pi and should also be installed on your laptop/phone. Authenticate those devices into the same tailnet. Use the Pi's Tailscale/MagicDNS address for private access.
+The chosen DNS name is `omnexa.duckdns.org`. DuckDNS only maps a name to an IP address; it does not create a secure private network. Tailscale is installed on the Pi and should also be installed on your laptop/phone. Authenticate those devices into the same tailnet. Use the Pi's Tailscale IP or MagicDNS name with the service ports printed by the installer.
 
-The install script enables Tailscale but does not expose services publicly or configure router port forwarding. It does not automatically publish every app with Tailscale Serve. See `docs/remote-access.md` before enabling any remote route. Do not expose Vaultwarden, Authentik admin, or database ports to the public internet.
+The install script enables Tailscale but does not expose services publicly or configure router port forwarding. The app containers publish their web ports on the Pi; those ports are reachable from tailnet devices after the Pi and client devices join the same tailnet. The portal's embedded Open WebUI drawer is available on the configured app hostname; on a direct Tailscale IP the AI link opens Open WebUI in a new tab because its anti-framing policy is retained. See `docs/remote-access.md` before enabling any remote route. Do not expose Vaultwarden, Authentik admin, or database ports to the public internet.
 
 ## Hardware notes
 

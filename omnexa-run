@@ -7,7 +7,7 @@ if [[ "${1:-}" == "--help" ]]; then
   exit 0
 fi
 if [[ $EUID -eq 0 ]]; then echo "Run this as your normal Raspberry Pi user, not with sudo."; exit 1; fi
-./scripts/preflight.sh
+bash ./scripts/preflight.sh
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Installing Docker Engine..."
@@ -26,12 +26,14 @@ if grep -q 'CHANGE_ME' .env || ! grep -q '^AUTHENTIK_BOOTSTRAP_EMAIL=.' .env; th
   [[ "$admin_email" == *@*.* ]] || { echo "Enter a valid email address."; exit 1; }
   read -rsp "Authentik administrator password (minimum 12 characters): " admin_password; echo
   [[ ${#admin_password} -ge 12 ]] || { echo "Password must be at least 12 characters."; exit 1; }
-  export OMNEXA_ADMIN_EMAIL="$admin_email" OMNEXA_ADMIN_PASSWORD="$admin_password"
+  read -rsp "Nextcloud administrator password (minimum 12 characters): " nextcloud_password; echo
+  [[ ${#nextcloud_password} -ge 12 ]] || { echo "Password must be at least 12 characters."; exit 1; }
+  export OMNEXA_ADMIN_EMAIL="$admin_email" OMNEXA_ADMIN_PASSWORD="$admin_password" OMNEXA_NEXTCLOUD_PASSWORD="$nextcloud_password"
   python3 - <<'PY'
 from pathlib import Path
 import os,secrets
 p=Path(".env")
-vals={"AUTHENTIK_BOOTSTRAP_EMAIL":os.environ["OMNEXA_ADMIN_EMAIL"],"AUTHENTIK_BOOTSTRAP_PASSWORD":os.environ["OMNEXA_ADMIN_PASSWORD"]}
+vals={"AUTHENTIK_BOOTSTRAP_EMAIL":os.environ["OMNEXA_ADMIN_EMAIL"],"AUTHENTIK_BOOTSTRAP_PASSWORD":os.environ["OMNEXA_ADMIN_PASSWORD"],"NEXTCLOUD_ADMIN_PASSWORD":os.environ["OMNEXA_NEXTCLOUD_PASSWORD"]}
 sizes={"WEBUI_SECRET_KEY":48,"CONNECT_API_KEY":40,"MYSQL_ROOT_PASSWORD":32,"MYSQL_PASSWORD":32,"NEXTCLOUD_ADMIN_PASSWORD":28,"AUTHENTIK_POSTGRES_PASSWORD":36,"AUTHENTIK_SECRET_KEY":60}
 out=[]; seen=set()
 for line in p.read_text().splitlines():
@@ -46,7 +48,7 @@ for k,v in vals.items():
     if k not in seen: out.append(f"{k}='"+v.replace("\\","\\\\").replace("'","\\'")+"'")
 p.write_text("\n".join(out)+"\n")
 PY
-  unset OMNEXA_ADMIN_PASSWORD
+  unset OMNEXA_ADMIN_PASSWORD OMNEXA_NEXTCLOUD_PASSWORD
 fi
 
 if ! command -v tailscale >/dev/null 2>&1; then curl -fsSL https://tailscale.com/install.sh | sh; fi

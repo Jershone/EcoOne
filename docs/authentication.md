@@ -7,9 +7,9 @@ Open Authentik at `http://PI-LAN-IP:9000` or through the Pi's Tailscale IP. Do n
 ## Open WebUI (native OIDC)
 
 1. In Authentik, create an OAuth2/OpenID Connect provider and application with slug `openwebui`.
-2. Set the strict redirect URI to `https://ai.omnexa.duckdns.org/oauth/oidc/callback`. This must match the actual HTTPS URL used by Open WebUI; if you change the hostname, change this URI too.
+2. Set the strict redirect URI to `https://TAILSCALE_HOSTNAME:8445/oauth/oidc/callback`. Replace `TAILSCALE_HOSTNAME` with the exact MagicDNS name printed by the installer. The Open WebUI redirect is served privately on port 8445.
 3. Copy the Client ID and Client Secret into `OPEN_WEBUI_OAUTH_CLIENT_ID` and `OPEN_WEBUI_OAUTH_CLIENT_SECRET` in `.env`.
-4. Set `OPEN_WEBUI_OPENID_PROVIDER_URL` to `https://AUTHENTIK-HTTPS-URL/application/o/openwebui/.well-known/openid-configuration`.
+4. Set `OPEN_WEBUI_OPENID_PROVIDER_URL` to `https://TAILSCALE_HOSTNAME:8444/application/o/openwebui/.well-known/openid-configuration`.
 5. Recreate Open WebUI: `docker compose up -d --force-recreate open-webui`.
 6. Test with a non-admin account. Keep an emergency local admin login until SSO is verified.
 

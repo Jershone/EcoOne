@@ -1,0 +1,46 @@
+{
+    admin off
+}
+
+{$ONEOS_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    reverse_proxy portal:80
+}
+
+ai.{$ONEOS_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    # Open WebUI's own CSP allows only the portal to frame it.
+    # Strip only the legacy X-Frame-Options header at this reverse proxy.
+    header -X-Frame-Options
+    reverse_proxy open-webui:8080
+}
+
+cloud.{$ONEOS_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    redir /.well-known/carddav /remote.php/dav 301
+    redir /.well-known/caldav /remote.php/dav 301
+    reverse_proxy nextcloud:80
+}
+
+vault.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy vaultwarden:80
+}
+
+home.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy host.docker.internal:8123
+}
+
+navet.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy navet:80
+}
+
+connect.{$ONEOS_DOMAIN} {
+    tls internal
+    reverse_proxy connect:8000
+}

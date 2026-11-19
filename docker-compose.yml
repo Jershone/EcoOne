@@ -60,7 +60,7 @@ services:
       WEBUI_SESSION_COOKIE_SAME_SITE: lax
       WEBUI_AUTH_COOKIE_SAME_SITE: lax
       XFRAME_OPTIONS: SAMEORIGIN
-      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' https://${ONEOS_DOMAIN:-omnexa.duckdns.org}"
+      CONTENT_SECURITY_POLICY: "frame-ancestors 'self' https://${TAILSCALE_HOSTNAME}:8443"
     ports: ["127.0.0.1:3000:8080"]
     volumes: ["./data/open-webui:/app/backend/data"]
     networks: [omnexa]

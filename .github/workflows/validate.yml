@@ -25,7 +25,9 @@ jobs:
           cp .env.example .env
           sed -i 's/^CHANGE_ME$/ci-placeholder-secret/g' .env
           sed -i 's/^TAILSCALE_HOSTNAME=$/TAILSCALE_HOSTNAME=pi.example.ts.net/' .env
+          sed -i 's/^AUTHENTIK_BOOTSTRAP_EMAIL=$/AUTHENTIK_BOOTSTRAP_EMAIL=ci@example.test/' .env
           docker compose config --quiet
+          docker run --rm -e ONEOS_DOMAIN=omnexa.example.test -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Check for accidentally committed secrets
         run: |
           ! grep -RInE '(sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|-----BEGIN (RSA |EC )?PRIVATE KEY-----)' --exclude-dir=.git --exclude='*.md' .

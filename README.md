@@ -1,73 +1,65 @@
 # Omnexa — connected self-hosted ecosystem
 
-Omnexa is a Raspberry Pi deployment project, not a replacement operating system. Each upstream application keeps its own interface. The portal is a launcher and embeds the real Open WebUI interface in a narrow desktop drawer / full-screen mobile panel.
+Omnexa is a self-hosted app ecosystem for Raspberry Pi OS 64-bit. It is not a replacement operating system: each upstream app keeps its own interface. The portal is a launcher, and the integration layer connects selected services.
 
 ## One-command installation
 
-On a fresh Raspberry Pi OS 64-bit installation, open a terminal and run:
+On a fresh Raspberry Pi OS 64-bit installation:
 
 ```bash
+sudo apt update
+sudo apt install -y git curl ca-certificates
 git clone https://github.com/Jershone/EcoOne.git Omnexa
 cd Omnexa
 chmod +x omnexa-run
 ./omnexa-run
 ```
 
-The installer checks Docker, generates unique secrets, asks for the Authentik administrator email and password, installs Tailscale, asks you to authenticate the Pi into your tailnet, starts the services, and opens the Authentik setup page. It does not configure router port forwarding.
+The installer checks architecture, memory, and disk space; installs Docker if needed; generates secrets; asks for the initial Authentik administrator email/password; enrolls the Pi in Tailscale; generates the Authentik forward-auth blueprint for its MagicDNS hostname; validates Compose; and starts the stack.
 
-You can run `./omnexa-run` again to update/reconcile the stack. The script never overwrites an existing `.env`.
+Tailscale sign-in is interactive. Install Tailscale on each phone/laptop and join the same tailnet. Enable MagicDNS and HTTPS certificates when prompted. No router port forwarding is required.
 
-## Identity and access
+## Authentication model
 
-Authentik is Omnexa's central identity provider. It is included with its own PostgreSQL database and persistent data. The first account is Authentik's `akadmin` administrator. Use the Authentik admin UI to add people, groups, and app providers.
+Authentik is the central identity provider and user/group directory. The installer automatically configures its embedded proxy outpost and a shared forward-auth provider for browser access to Open WebUI, Nextcloud, and Navet.
 
-- Open WebUI supports Authentik OIDC; provider/client details are configured in Authentik and then entered in `.env` (see `docs/authentication.md`).
-- Nextcloud can use its OIDC user backend, but it requires installing/configuring the upstream user_oidc app and a provider. Follow the guide.
-- Home Assistant does not provide generic OIDC login as a built-in feature. It can be protected at the reverse-proxy layer, but do not enable proxy authentication until trusted-proxy and direct-access rules are tested.
-- Navet uses its Home Assistant connection.
-- Vaultwarden remains on its own account system. Do not put a password manager behind an untested SSO/proxy configuration; preserve its supported Bitwarden clients and emergency access.
-- Tailscale keeps its own Google/GitHub identity provider. This is deliberate: if Omnexa or Authentik is offline, you must still be able to reach the Pi to repair it.
+Forward authentication is an access gate, not automatic account federation. Those upstream apps still retain their own account login until their native OIDC integration is configured. Navet also uses Home Assistant's supported sign-in. Home Assistant and Vaultwarden retain native authentication because generic proxy redirects can break their APIs, device integrations, and Bitwarden clients. Tailscale identity remains independent for recovery.
 
-Authentik does not magically unify accounts in apps without compatible SSO. The guides identify what is native OIDC and what needs proxy protection.
+See [docs/authentication.md](docs/authentication.md) for the exact boundaries and setup details.
 
 ## Included services
 
 | Service | Purpose |
 |---|---|
-| Open WebUI | Hosted/cloud model UI; configure provider API keys in its admin settings |
-| Authentik | Central identity provider and user/group management |
-| Nextcloud + MariaDB + Redis | Files and collaboration |
-| Vaultwarden | Separate password manager |
+| Omnexa portal | Launcher for hosted services |
+| Authentik | Central identity and shared browser access |
+| Open WebUI | Cloud model interface; no local LLM |
+| Nextcloud + MariaDB + Redis + cron | Files and collaboration |
+| Vaultwarden | Password manager with native Bitwarden-compatible auth |
 | Home Assistant | Smart-home platform |
 | Navet | Home Assistant-connected dashboard |
 | Omnexa Connect | Limited API tools for Nextcloud and Home Assistant |
-| Caddy | Reverse proxy |
-| AppFlowy | Optional separate installer; current server distribution has a separate commercial self-host licence |
+| Caddy | Reverse proxy and Authentik forward-auth gate |
+| Tailscale | Private remote access |
 
-Magic Earth and Google Search remain external services. Immich and LibreChat are not included.
+Magic Earth and Google Search remain external services. Immich and LibreChat are not included. AppFlowy is optional and is not installed by the core installer.
 
-## Remote access and DuckDNS
+## Hardware
 
-The chosen DNS name is `omnexa.duckdns.org`. DuckDNS only maps a name to an IP address; it does not create a secure private network. Tailscale is installed on the Pi and should also be installed on your laptop/phone. Authenticate those devices into the same tailnet. Use the Pi's Tailscale IP or MagicDNS name with the service ports printed by the installer.
-
-The installer records the Pi's MagicDNS hostname, sets Authentik's external base URL, and configures private Tailscale Serve HTTPS routes (not public Funnel) for the portal and web apps. The portal's embedded Open WebUI drawer is used on the configured app hostname; on the direct Tailscale hostname the AI link opens Open WebUI in a new tab because its anti-framing policy is retained. Home Assistant remains available over the encrypted tailnet on port 8123. See `docs/remote-access.md`. Do not expose Vaultwarden, Authentik admin, or database ports to the public internet.
-
-## Hardware notes
-
-Target: Raspberry Pi 4, 4 GB RAM, Raspberry Pi OS 64-bit. This is a heavy stack for 4 GB. Use an SSD for persistent app/database data as soon as possible. Start with the core services and monitor memory; AppFlowy is optional and should be deferred. No local LLM is installed; inference is through cloud model APIs.
+Target: Raspberry Pi 4, 4 GB RAM, Raspberry Pi OS 64-bit. The full stack is demanding for 4 GB. Use an SSD for persistent application/database data as soon as possible; the microSD is suitable for initial setup, not ideal long-term storage. AppFlowy remains optional and should be deferred until resource usage is measured.
 
 ## Operations
 
 ```bash
-./omnexa-run                 # install or reconcile
+./scripts/doctor.sh          # endpoint and resource checks
 ./scripts/update.sh          # pull and update containers
-./scripts/backup.sh          # local backup (copy it off the Pi)
+./scripts/backup.sh          # local backup; copy it off the Pi
 docker compose ps
 docker compose logs -f authentik-server authentik-worker
 ```
 
-Keep `.env`, `data/`, and `backups/` private. Do not commit secrets. Backups on the same SD card are not sufficient.
+Keep `.env`, `data/`, and `backups/` private. A backup on the same SD card is not disaster recovery.
 
 ## Validation status
 
-This repository change has not been run on the physical Raspberry Pi. Verify Docker Compose and each upstream app on the Pi before relying on it. The installer is designed to be rerunnable, but app-specific SSO still requires the configuration steps in the docs.
+The repository includes CI checks for shell syntax, Python syntax, and Docker Compose configuration. These checks do not replace a real installation test on the target Raspberry Pi. Do not rely on the stack for critical data until the Pi installation, app sign-ins, backups, restores, and remote access have all been verified.

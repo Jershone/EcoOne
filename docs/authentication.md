@@ -1,32 +1,34 @@
-# Omnexa identity and SSO
+# Omnexa authentication
 
-Authentik is the central identity provider and user directory. The installer creates the initial built-in `akadmin` administrator using the email and password entered during `./omnexa-run`. Authentik's bootstrap account is named `akadmin`; the installer does not invent a different admin username. The bootstrap values are only consumed on the first startup.
+Authentik is the central identity provider and user/group directory. The installer creates its initial built-in `akadmin` account using the email and password entered during setup.
 
-Open Authentik at `http://PI-LAN-IP:9000` or through the Pi's Tailscale IP. Do not expose port 9000 publicly. Add named users and groups in Directory, then assign applications to the groups that should use them.
+## Shared browser access
 
-## Open WebUI (native OIDC)
+The installer writes an Authentik blueprint containing a domain-level forward-auth provider for the Pi's Tailscale MagicDNS hostname. Authentik's embedded proxy outpost is assigned to that provider. Caddy checks the user's Authentik session before forwarding browser requests to:
 
-1. In Authentik, create an OAuth2/OpenID Connect provider and application with slug `openwebui`.
-2. Set the strict redirect URI to `https://TAILSCALE_HOSTNAME:8445/oauth/oidc/callback`. Replace `TAILSCALE_HOSTNAME` with the exact MagicDNS name printed by the installer. The Open WebUI redirect is served privately on port 8445.
-3. Copy the Client ID and Client Secret into `OPEN_WEBUI_OAUTH_CLIENT_ID` and `OPEN_WEBUI_OAUTH_CLIENT_SECRET` in `.env`.
-4. Set `OPEN_WEBUI_OPENID_PROVIDER_URL` to `https://TAILSCALE_HOSTNAME:8444/application/o/openwebui/.well-known/openid-configuration`.
-5. Recreate Open WebUI: `docker compose up -d --force-recreate open-webui`.
-6. Test with a non-admin account. Keep an emergency local admin login until SSO is verified.
+- Open WebUI on Tailscale HTTPS port 8445
+- Nextcloud on Tailscale HTTPS port 8446
+- Navet on Tailscale HTTPS port 8448
 
-Open WebUI supports one OIDC provider at a time. Authentik is not automatically connected until the provider and client details are entered.
+The browser apps are routed through Caddy listeners bound to loopback-only host ports. Their direct container ports are not published to the LAN. The Tailscale Serve endpoints are private to the tailnet.
 
-## Nextcloud
+If the blueprint has not been applied yet, inspect `docker compose logs authentik-worker`. Authentik discovers mounted YAML blueprints automatically. The configuration uses Authentik's embedded outpost, so no separately managed proxy-outpost token is required.
 
-Nextcloud's OIDC integration is not enabled automatically. Install the upstream `user_oidc` app and configure it with an Authentik provider's discovery URL and client credentials. Test account mapping and recovery before changing existing accounts. Do not assume matching email addresses alone safely merge accounts.
+## App-specific accounts still exist
 
-## Home Assistant and Navet
+Forward authentication is an access gate; it does not automatically create or log into an account inside every upstream app. Keep each app's own supported account system until its native SSO has been configured and tested.
 
-Home Assistant does not include generic OIDC login as a standard built-in provider. Authentik can protect a web route through a proxy outpost, but that can interfere with mobile apps, webhooks, local device discovery, and API clients. Keep Home Assistant's native login and API token until a proxy design is separately tested. Navet continues to authenticate through Home Assistant.
+- **Open WebUI:** Authentik gates browser access. Open WebUI still has its own account/login unless its native OIDC provider is configured. Configure OIDC only after creating a provider in Authentik and entering its client details in `.env`. Keep an emergency local admin.
+- **Nextcloud:** Authentik gates browser access. For true single sign-on inside Nextcloud, install/configure the upstream `user_oidc` app and test account mapping before disabling local login.
+- **Navet:** Authentik gates access to the Navet web app. Navet then uses its supported Home Assistant sign-in to connect to the smart-home instance. This second authorization is intentional.
+- **Home Assistant:** It keeps its native login and API token. The Home Assistant mobile app, device discovery, webhooks, and API endpoints must continue to work; do not put a generic browser login redirect in front of the whole API.
+- **Vaultwarden:** It keeps its native Bitwarden-compatible accounts and sync/API authentication. A generic proxy login in front of its sync endpoints can break clients, so it is not put behind the shared browser gate.
+- **Tailscale:** Its identity remains independent of Authentik. This provides a recovery path if the Pi or Authentik is offline.
 
-## Vaultwarden
+## User management
 
-Vaultwarden keeps its own account system. Do not force an unsupported SSO/proxy configuration in front of its web vault or sync API; it can break Bitwarden clients and account recovery. Keep signups disabled after creating the intended account.
+Open Authentik at the private HTTPS URL printed by the installer (port 8444). Sign in as `akadmin`, then create named users and groups in Directory. The shared forward-auth provider currently grants access to users assigned to the provider's application; review access policies before adding untrusted users.
 
-## Honest SSO boundary
+## Recovery
 
-Authentik does not magically unify accounts in apps without compatible SSO. In this initial deployment, Authentik provides user/group management and native OIDC integration for Open WebUI after manual provider setup. Nextcloud requires its OIDC app configuration. Home Assistant and Vaultwarden retain their supported native authentication until a separately tested integration is implemented.
+If Authentik is unavailable, use SSH over Tailscale to repair the Pi. Do not expose Authentik, Docker, database ports, Home Assistant, or Vaultwarden directly to the public internet. Tailscale Serve must remain private; do not enable Funnel.

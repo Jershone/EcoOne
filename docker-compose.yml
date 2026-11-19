@@ -44,7 +44,7 @@ services:
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?Run scripts/install.sh first}
       WEBUI_URL: https://ai.${ONEOS_DOMAIN:-oneos.home.arpa}
       ENABLE_WEBSOCKET_SUPPORT: "true"
-      ENABLE_SIGNUP: "true"
+      ENABLE_SIGNUP: ${OPEN_WEBUI_ENABLE_SIGNUP:-true}
       DEFAULT_USER_ROLE: user
       CORS_ALLOW_ORIGIN: https://ai.${ONEOS_DOMAIN:-oneos.home.arpa};https://${ONEOS_DOMAIN:-oneos.home.arpa}
       WEBUI_SESSION_COOKIE_SECURE: "true"

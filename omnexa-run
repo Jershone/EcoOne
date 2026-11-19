@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+if [[ "${1:-}" == "--help" ]]; then
+  echo "Usage: ./omnexa-run [--install]"
+  echo "Installs Docker (if needed), configures Omnexa, enrolls this Pi in Tailscale, and starts the stack."
+  exit 0
+fi
+
+if [[ $EUID -eq 0 ]]; then
+  echo "Run this as your normal Raspberry Pi user, not with sudo."
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Installing Docker Engine..."
+  curl -fsSL https://get.docker.com -o /tmp/omnexa-docker-install.sh
+  sudo sh /tmp/omnexa-docker-install.sh
+  rm -f /tmp/omnexa-docker-install.sh
+  sudo usermod -aG docker "$USER"
+  echo "Docker installed. Log out and back in so your account can use Docker, then run ./omnexa-run again."
+  exit 0
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose v2 is required. Install the Docker Compose plugin and rerun."
+  exit 1
+fi
+
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+fi
+
+if grep -q 'CHANGE_ME' .env || ! grep -q '^AUTHENTIK_BOOTSTRAP_EMAIL=.' .env; then
+  echo
+  echo "First-time Omnexa administrator setup"
+  read -rp "Administrator email: " admin_email
+  [[ "$admin_email" == *@*.* ]] || { echo "Enter a valid email address."; exit 1; }
+  read -rsp "Authentik administrator password (minimum 12 characters): " admin_password
+  echo
+  [[ ${#admin_password} -ge 12 ]] || { echo "Password must be at least 12 characters."; exit 1; }
+  export OMNEXA_ADMIN_EMAIL="$admin_email" OMNEXA_ADMIN_PASSWORD="$admin_password"
+  python3 - <<'PY'
+from pathlib import Path
+import os, secrets
+p = Path(".env")
+values = {
+    "AUTHENTIK_BOOTSTRAP_EMAIL": os.environ["OMNEXA_ADMIN_EMAIL"],
+    "AUTHENTIK_BOOTSTRAP_PASSWORD": os.environ["OMNEXA_ADMIN_PASSWORD"],
+}
+sizes = {
+    "WEBUI_SECRET_KEY": 48,
+    "CONNECT_API_KEY": 40,
+    "MYSQL_ROOT_PASSWORD": 32,
+    "MYSQL_PASSWORD": 32,
+    "NEXTCLOUD_ADMIN_PASSWORD": 28,
+    "AUTHENTIK_POSTGRES_PASSWORD": 36,
+    "AUTHENTIK_SECRET_KEY": 60,
+}
+lines = p.read_text().splitlines()
+out, seen = [], set()
+for line in lines:
+    if "=" in line and not line.lstrip().startswith("#"):
+        key, value = line.split("=", 1)
+        if key in values:
+            value = values[key]
+            seen.add(key)
+        elif key in sizes and (value == "CHANGE_ME" or not value):
+            value = secrets.token_urlsafe(sizes[key])
+        # Compose's dotenv parser treats single-quoted values literally.
+        if key in values:
+            value = "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+        line = f"{key}={value}"
+    out.append(line)
+for key, value in values.items():
+    if key not in seen:
+        value = "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+        out.append(f"{key}={value}")
+p.write_text("\n".join(out) + "\n")
+PY
+  unset OMNEXA_ADMIN_PASSWORD
+  chmod 600 .env
+fi
+
+echo
+echo "Checking Tailscale..."
+if ! command -v tailscale >/dev/null 2>&1; then
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+if ! tailscale status >/dev/null 2>&1; then
+  echo "A browser sign-in is required to add this Raspberry Pi to your existing tailnet."
+  sudo tailscale up
+fi
+
+mkdir -p data/{caddy,caddy-config,open-webui,mariadb,redis,nextcloud,vaultwarden,homeassistant,navet,authentik-postgres,authentik-media,authentik-certs,authentik-custom-templates} backups
+chmod 600 .env
+docker compose config --quiet
+echo "Pulling service images..."
+docker compose pull
+echo "Starting Omnexa..."
+docker compose up -d --build --remove-orphans
+
+PI_IP="$(hostname -I | awk '{print $1}')"
+TAIL_IP="$(tailscale ip -4 2>/dev/null | head -n1 || true)"
+echo
+echo "Omnexa containers:"
+docker compose ps
+echo
+echo "Initial setup:"
+echo "  Portal:       http://${PI_IP}:8080"
+echo "  Authentik:    http://${PI_IP}:9000"
+echo "  Open WebUI:   https://ai.${ONEOS_DOMAIN:-omnexa.duckdns.org}"
+echo
+if [[ -n "$TAIL_IP" ]]; then
+  echo "Private Tailscale IP: $TAIL_IP"
+  echo "Use this IP from your other devices after installing Tailscale and joining the same tailnet."
+fi
+echo
+echo "Create users and app providers in Authentik. See docs/authentication.md."
+echo "Do not configure router port forwarding. DuckDNS is not used as a public ingress."

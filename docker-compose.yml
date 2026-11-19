@@ -44,7 +44,7 @@ services:
       WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?Run omnexa-run first}
       WEBUI_URL: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8445
       ENABLE_WEBSOCKET_SUPPORT: "true"
-      ENABLE_SIGNUP: "false"
+      ENABLE_SIGNUP: "true"
       ENABLE_OAUTH_SIGNUP: ${OPEN_WEBUI_ENABLE_OAUTH_SIGNUP:-true}
       OAUTH_PROVIDER_NAME: Authentik
       OAUTH_CLIENT_ID: ${OPEN_WEBUI_OAUTH_CLIENT_ID:-}
@@ -132,7 +132,7 @@ services:
     environment:
       DOMAIN: https://${TAILSCALE_HOSTNAME:?Run omnexa-run first}:8447
       WEBSOCKET_ENABLED: "true"
-      SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
+      SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
     ports: ["127.0.0.1:8082:80"]
     volumes: ["./data/vaultwarden:/data"]
     networks: [omnexa]
